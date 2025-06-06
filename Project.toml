@@ -3,6 +3,11 @@ uuid = "5b45e325-545f-4a0f-a688-890b70d0fa47"
 authors = ["Sascha Stüttgen <sascha.stuettgen@rwth-aachen.de> and contributors"]
 version = "1.0.0-DEV"
 
+[deps]
+AbstractAlgebra = "c3fe647b-3220-5bb0-a1ea-a7954cac585d"
+BracketAlgebras = "304cb2e1-bfe1-4bb6-af58-8b73a9a6b3c1"
+Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
+
 [compat]
 julia = "1.6.7"
 
