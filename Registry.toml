@@ -1,0 +1,5 @@
+name = "RigidityTheoryTools"
+uuid = "57946992-124b-469a-abbd-2eb6dac6b77b"
+repo = "https://github.com/Saschobolt/RigidityTheoryTools.jl"
+
+[packages]
