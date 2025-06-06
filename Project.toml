@@ -9,7 +9,7 @@ BracketAlgebras = "304cb2e1-bfe1-4bb6-af58-8b73a9a6b3c1"
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
 
 [compat]
-julia = "1.6.7"
+julia = "1.10.0"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
