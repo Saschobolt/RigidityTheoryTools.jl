@@ -3,3 +3,4 @@ uuid = "57946992-124b-469a-abbd-2eb6dac6b77b"
 repo = "https://github.com/Saschobolt/RigidityTheoryTools.jl"
 
 [packages]
+5b45e325-545f-4a0f-a688-890b70d0fa47 = { name = "RigidityTheoryTools", path = "R/RigidityTheoryTools" }
