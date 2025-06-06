@@ -2,3 +2,6 @@
 AbstractAlgebra = "c3fe647b-3220-5bb0-a1ea-a7954cac585d"
 BracketAlgebras = "304cb2e1-bfe1-4bb6-af58-8b73a9a6b3c1"
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
+
+["0.0.2-0"]
+Combinatorics = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
