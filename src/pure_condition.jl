@@ -114,7 +114,7 @@ function condition(g::Graphs.SimpleDiGraph, B::BracketAlgebra; remaining_verts::
         return sign(g, v, edges, d) * B(pushfirst!([Graphs.dst(e) for e in edges], v)) * condition(reduction(g, v, edges, d), B; remaining_verts=setdiff(remaining_verts, [v]))
     elseif defect > 0
         # If defect > 0 the determinant has to be calculated using Laplace expansion that involve more than one nonzero summand. 
-        # See Wikipedia article.
+        # See Wikipedia article for Laplace expansion by multiple columns.
 
         edges_onlyout = setdiff([Graphs.Edge(v, w) for w in Graphs.outneighbors(g, v)], [Graphs.Edge(v, w) for w in Graphs.inneighbors(g, v)])
         edges_both = [Graphs.Edge(v, w) for w in intersect(Graphs.outneighbors(g, v), Graphs.inneighbors(g, v))]
@@ -128,21 +128,96 @@ function condition(g::Graphs.SimpleDiGraph, B::BracketAlgebra; remaining_verts::
     end
 end
 
-function condition(g::Graphs.SimpleDiGraph, d::Integer=2)
-    B = BracketAlgebra(g, d)
+function condition(g::Graphs.SimpleDiGraph, d::Integer=2; B::BracketAlgebra=BracketAlgebra(g, d))
+    if B.d != d
+        throw(ArgumentError("BracketAlgebra B and d don't match: B.d=$(B.d), d=$d."))
+    end
+    if B.n != Graphs.nv(g)
+        throw(ArgumentError("BracketAlgebra and graph don't match: B.n=$(B.n), nv(g)=$(Graphs.nv(g))."))
+    end
 
     return condition(g, B)
 end
 
-function condition(g::Graphs.AbstractSimpleGraph, d::Integer=2; tiedown_verts::Union{Nothing,AbstractVector{<:Integer}}=nothing)
+"""
+    condition(g::Graphs.AbstractSimpleGraph, d::Integer=2; tiedown_verts::Union{Nothing,AbstractVector{<:Integer}}=nothing, vertex_labels::Vector=collect(1:nv(g)), tiedown_label_prefix::String="tiedown")
+
+Calculate the condition for the graph `g` to be infinitesimally flexible in P^`d` as an element of its bracket algebra with tiedown.
+# Arguments:
+- g::Graphs.AbstractSimpleGraph                                     Graph of which condition is computed
+- d::Integer=2                                                      Dimension of underlying projective space
+- tiedown_verts::Union{Nothing,AbstractVector{<:Integer}}=nothing   Vertex indices of vertices to tie down.
+- vertex_labels::Vector=collect(1:nv(g))                            Labels for vertices in bracket algebra expression.
+- tiedown_label_prefix::String="tiedown"                            Prefix for tiedown vertex label in bracket algebra expression.
+
+# Examples
+```jldoctest
+julia> m = [0 1 1 1 1;
+       1 0 1 1 1;
+       1 1 0 1 1;
+       1 1 1 0 0;
+       1 1 1 0 0;];
+
+julia> g = Graph(m);
+
+julia> condition(g, 3)
+Any[1, "tiedown_1", "tiedown_2", "tiedown_3"]Any[1, 2, "tiedown_4", "tiedown_5"]Any[1, 2, 3, "tiedown_6"]Any[1, 2, 3, 5]Any[1, 2, 3, 4]
+
+julia> condition(g, 3, tiedown_verts=[1,4,5])
+Any[1, "tiedown_1", "tiedown_2", "tiedown_3"]Any[1, 2, "tiedown_4", "tiedown_5"]Any[1, 2, 3, "tiedown_6"]Any[1, 2, 3, 5]Any[1, 2, 3, 4]
+
+julia> condition(g, 3, tiedown_verts=[1,4,5])
+Any[1, "tiedown_1", "tiedown_2", "tiedown_3"]Any[1, 4, "tiedown_4", "tiedown_5"]Any[1, 3, 4, 5]Any[1, 2, 5, "tiedown_6"]Any[1, 2, 3, 4] + Any[1, "tiedown_1", "tiedown_2", "tiedown_3"]Any[1, 4, "tiedown_4", "tiedown_5"]Any[1, 3, 5, "tiedown_6"]Any[1, 2, 4, 5]Any[1, 2, 3, 4]
+```
+"""
+function condition(g::Graphs.AbstractSimpleGraph, d::Integer=2; tiedown_verts::Union{Nothing,AbstractVector{<:Integer}}=nothing, vertex_labels::Vector=collect(1:nv(g)), tiedown_label_prefix::String="tiedown")
     if isnothing(tiedown_verts)
         tiedown_verts = collect(1:d)
     end
 
-    return condition(tiedown(g, d; tiedown_verts=tiedown_verts), d)
+    g_tiedown = tiedown(g, d; tiedown_verts=tiedown_verts)
+
+    # Bracket Algebra of which condition is an elment of. It has nv(g) + d(d+1)/2 points. Dimension of underlying space is d. New tiedown vertex labels are tiedown_label_prefix_id.
+    labels = vertex_labels
+    tiedown_labels = [tiedown_label_prefix * "_$i" for i in collect(1:Integer(d * (d + 1) / 2))]
+    labels = vcat(labels, tiedown_labels)
+    B = BracketAlgebra(g_tiedown, d, point_labels=labels)
+
+    return condition(tiedown(g, d, tiedown_verts=tiedown_verts), d; B=B)
 end
 
-function pure_condition(g::Graphs.AbstractSimpleGraph, d::Integer=2; tiedown_verts::Union{Nothing,AbstractVector{<:Integer}}=nothing)
+"""
+    pure_condition(g::Graphs.AbstractSimpleGraph, d::Integer=2; tiedown_verts::Union{Nothing,AbstractVector{<:Integer}}=nothing, vertex_labels::Vector=collect(1:nv(g)))
+
+Calculate the pure condition for the graph `g` to be infinitesimally flexible in P^`d` as an element of its bracket algebra with tiedown.
+# Arguments:
+- g::Graphs.AbstractSimpleGraph                                     Graph of which condition is computed
+- d::Integer=2                                                      Dimension of underlying projective space
+- tiedown_verts::Union{Nothing,AbstractVector{<:Integer}}=nothing   Vertex indices of vertices to tie down. Has to form an isostatic subgraph
+- vertex_labels::Vector=collect(1:nv(g))                            Labels for vertices in bracket algebra expression.
+- tiedown_label_prefix::String="tiedown"                            Prefix for tiedown vertex label in bracket algebra expression.
+
+# Examples
+```jldoctest
+julia> m = [0 1 1 1 1;
+       1 0 1 1 1;
+       1 1 0 1 1;
+       1 1 1 0 0;
+       1 1 1 0 0;];
+
+julia> g = Graph(m);
+
+julia> condition(g, 3)
+Any[1, "tiedown_1", "tiedown_2", "tiedown_3"]Any[1, 2, "tiedown_4", "tiedown_5"]Any[1, 2, 3, "tiedown_6"]Any[1, 2, 3, 5]Any[1, 2, 3, 4]
+
+julia> condition(g, 3, tiedown_verts=[1,4,5])
+Any[1, "tiedown_1", "tiedown_2", "tiedown_3"]Any[1, 2, "tiedown_4", "tiedown_5"]Any[1, 2, 3, "tiedown_6"]Any[1, 2, 3, 5]Any[1, 2, 3, 4]
+
+julia> condition(g, 3, tiedown_verts=[1,4,5])
+Any[1, "tiedown_1", "tiedown_2", "tiedown_3"]Any[1, 4, "tiedown_4", "tiedown_5"]Any[1, 3, 4, 5]Any[1, 2, 5, "tiedown_6"]Any[1, 2, 3, 4] + Any[1, "tiedown_1", "tiedown_2", "tiedown_3"]Any[1, 4, "tiedown_4", "tiedown_5"]Any[1, 3, 5, "tiedown_6"]Any[1, 2, 4, 5]Any[1, 2, 3, 4]
+```
+"""
+function pure_condition(g::Graphs.AbstractSimpleGraph, d::Integer=2; tiedown_verts::Union{Nothing,AbstractVector{<:Integer}}=nothing, vertex_labels::Vector=collect(1:nv(g)))
     if isnothing(tiedown_verts)
         tiedown_verts = collect(1:d)
     end
@@ -167,5 +242,10 @@ function pure_condition(g::Graphs.AbstractSimpleGraph, d::Integer=2; tiedown_ver
 
     remaining_verts = setdiff(1:Graphs.nv(g), tiedown_verts)
 
-    return condition(g_tiedown, BracketAlgebra(g, d); remaining_verts=remaining_verts)
+    return condition(g_tiedown, BracketAlgebra(g, d, point_labels=vertex_labels); remaining_verts=remaining_verts)
+end
+
+function pure_condition(f::Framework; tiedown_verts::Union{Nothing,AbstractVector{<:Integer}}=nothing)
+    g = graph(f)
+    return pure_condition(g, d(f), tiedown_verts=tiedown_verts, vertex_labels=labels(f))
 end
