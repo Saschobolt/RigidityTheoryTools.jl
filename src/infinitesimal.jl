@@ -7,7 +7,7 @@ Construct the rigidity matrix of the embedded graph `f`.
 ```jldoctest
 julia> G = complete_graph(4);
 
-julia> f = Framework(G, [0 1 0 0; 0 0 1 0; 0 0 0 1]);
+julia> f = Framework(G, [0. 1. 0. 0.; 0. 0. 1. 0.; 0. 0. 0. 1.]);
 
 julia> rigidity_matrix(f)
 6×12 Matrix{Float64}:
@@ -20,9 +20,9 @@ julia> rigidity_matrix(f)
 ```
 """
 function rigidity_matrix(f::AbstractEmbeddedGraph)
-    d, n = size(realization(f))
-    r = zeros(ne(graph(f)), d * n)
-    coords = realization(f)
+    coords = coordinate_matrix(f)
+    d, n = size(coords)
+    r = zeros(eltype(coords), ne(graph(f)), d * n)
     for (i, e) in enumerate(edges(graph(f)))
         v = src(e)
         w = dst(e)
