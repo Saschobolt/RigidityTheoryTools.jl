@@ -1,7 +1,7 @@
 name = "RigidityTheoryTools"
 uuid = "5b45e325-545f-4a0f-a688-890b70d0fa47"
 authors = ["Sascha Stüttgen <sascha.stuettgen@rwth-aachen.de> and contributors"]
-version = "0.0.3"
+version = "0.0.4"
 
 [deps]
 AbstractAlgebra = "c3fe647b-3220-5bb0-a1ea-a7954cac585d"
