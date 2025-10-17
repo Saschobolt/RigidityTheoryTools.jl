@@ -6,9 +6,10 @@ using BracketAlgebras
 using Combinatorics
 using GeometryBasics
 
-export Framework, graph, realization, coordinate_matrix, labels, d
+export Framework, graph, realization, coordinate_matrix, coordinate_matrix!, labels, d
 export rigidity_matrix, basis_inf_motions, is_infrigid, basis_inf_flex, index, is_genrigid, is_isostatic
 export tiedown, condition, pure_condition
+export plot_framework
 
 # abstract supertype for all embedded graphs. Every subtype has to have Fields
 # - `G::SimpleGraph`: graph with `n` vertices and `m` edges
@@ -154,5 +155,6 @@ end
 include("infinitesimal.jl")
 include("henneberg.jl")
 include("pure_condition.jl")
+include("plotting.jl")
 
 end
