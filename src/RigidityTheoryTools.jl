@@ -10,6 +10,7 @@ export Framework, graph, realization, coordinate_matrix, coordinate_matrix!, lab
 export rigidity_matrix, basis_inf_motions, is_infrigid, basis_inf_flex, index, is_genrigid, is_isostatic
 export tiedown, condition, pure_condition
 export plot_framework
+export QuotientGainEdge, QuotientGainGraph, add_gain_edge!, edge_gains, original_vertex, quotient_vertex, out_edges_with_gains, on_edges, representative_action
 
 # abstract supertype for all embedded graphs. Every subtype has to have Fields
 # - `G::SimpleGraph`: graph with `n` vertices and `m` edges
@@ -156,5 +157,6 @@ include("infinitesimal.jl")
 include("henneberg.jl")
 include("pure_condition.jl")
 include("plotting.jl")
+include("symmetric_rigidity.jl")
 
 end
