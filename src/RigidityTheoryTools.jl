@@ -11,7 +11,7 @@ export Framework, graph, realization, coordinate_matrix, coordinate_matrix!, lab
 export rigidity_matrix, basis_inf_motions, is_infrigid, basis_inf_flex, index, is_genrigid, is_isostatic
 export tiedown, condition, pure_condition
 export plot_framework
-export QuotientGainEdge, QuotientGainGraph, add_gain_edge!, edge_gains, original_vertex, quotient_vertex, out_edges_with_gains, on_edges, representative_action, quotient_graph, orbit_rigidity_matrix
+export QuotientGainEdge, QuotientGainGraph, add_gain_edge!, edge_gains, original_vertex, quotient_vertex, out_edges_with_gains, on_edges, representative_action, quotient_graph, orbit_rigidity_matrix, is_symmetric
 
 # abstract supertype for all embedded graphs. Every subtype has to have Fields
 # - `G::SimpleGraph`: graph with `n` vertices and `m` edges

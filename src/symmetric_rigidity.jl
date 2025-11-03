@@ -9,6 +9,12 @@ import Graphs: AbstractGraph, edgetype, nv, ne, vertices, edges,
     src, dst, has_edge, has_vertex, inneighbors, outneighbors,
     is_directed
 
+
+#################################################################
+#
+# Quotient Gain Graph Structure
+#
+#################################################################
 """
 An edge type for the Quotient Gain Graph.
 It represents an edge `((i, j); γ)` as defined in the paper,
@@ -205,8 +211,6 @@ function Graphs.inneighbors(g::QuotientGainGraph, v::Int)
     return unique(first(pair) for pair in g.in_gains[v])
 end
 
-# --- Helper Functions (Not in AbstractGraph, but necessary) ---
-
 """
 add_gain_edge!(g, s, d, gain)
 
@@ -285,7 +289,7 @@ function on_edges(edge::AbstractEdge, g::GroupElem)
     d = dst(edge)
 
     # Apply the group action to the vertices
-    res_action = Oscar.on_sets([s,d], g)
+    res_action = Oscar.on_sets([s, d], g)
     s_new = res_action[1]
     d_new = res_action[2]
 
@@ -297,172 +301,54 @@ function on_edges(edge::AbstractEdge, g::GroupElem)
     return EdgeType(s_new, d_new)
 end
 
-using Oscar
 
 """
-    representative_action(G::Oscar.Group, x, y, fun::Function = (x, g) -> x^g)
+    quotient_graph(g::AbstractGraph{V}, G::Group) where {V<:Integer}
 
-Finds a group element `g` in `G` such that `fun(x, g) == y`.
+Compute the quotient graph of the graph `g` under the action of the group `G`.
+This is the graph with vertices corresponding to the orbits of the vertices of `g` under the action of `G`, and edges corresponding to the orbits of the edges of `g`, with gains given by the group elements mapping representative vertices.
 
-This function implements a bi-directional Breadth-First Search (a "meet-in-
-the-middle" algorithm). It builds two search trees, one starting from `x`
-and one from `y`, and searches for a common element (a "collision").
+```jldoctest
+julia> g = SimpleGraph(6);
 
-The action `fun` must be a valid right group action, meaning that
-`fun(el, g1 * g2) == fun(fun(el, g1), g2)` for all `g1, g2` in `G`
-and `el` in the orbit.
+julia> add_edge!(g, 1, 2);
 
-# Arguments
-- `G::Oscar.Group`: The group containing the element we are looking for.
-- `x`: The starting element of the orbit.
-- `y`: The target element of the orbit.
-- `fun::Function`: (Optional) A function `(el, g::Oscar.GroupElem) -> el_new`
-  that describes the right action. Defaults to Oscar's `(x, g) -> x^g`.
+julia> add_edge!(g, 2, 3);
 
-# Returns
-- An `Oscar.GroupElem` `g` such that `fun(x, g) == y`.
-- `nothing` if `x` and `y` are not in the same orbit (i.e., no such
-  element `g` exists).
+julia> add_edge!(g, 1, 3);
+
+julia> add_edge!(g, 1, 4);
+
+julia> add_edge!(g, 2, 5);
+
+julia> add_edge!(g, 3, 6);
+
+julia> add_edge!(g, 4, 5);
+
+julia> add_edge!(g, 5, 6);
+
+julia> add_edge!(g, 4, 6);
+
+julia> G = Oscar.symmetric_group(6);
+
+julia> H, _ = Oscar.sub(G, [Oscar.perm([2,3,1,5,6,4])]);
+
+julia> qg = quotient_graph(g, H)
+QuotientGainGraph (2 vertices, 3 edges) with gains in Permutation group of degree 6
+```
 """
-function representative_action(G::Group, x, y, fun::Function=(x, g) -> x^g) # wegschmeißen, dafür Oscar.is_conjugate_with_data benutzen (gset)
-    # --- 1. Handle Trivial Case ---
-    if x == y
-        return one(G)
-    end
-
-    # --- 2. Initialize Generators ---
-    # We need both generators and their inverses to traverse the
-    # entire Schreier graph.
-    gens_list = Oscar.gens(G)
-    # S is our set of "steps"
-    S = [gens_list; inv.(gens_list)]
-
-    # --- 3. Initialize Data Structures ---
-    # Get types for type-stable dictionaries and arrays
-    T_orbit = typeof(x)
-    T_group = eltype(G)
-
-    # from_x: Dict(orbit_el => g) such that fun(x, g) == orbit_el
-    from_x = Dict{T_orbit,T_group}(x => one(G))
-    # from_y: Dict(orbit_el => h) such that fun(y, h) == orbit_el
-    from_y = Dict{T_orbit,T_group}(y => one(G))
-
-    # Queues for the BFS
-    queue_x = T_orbit[x]
-    queue_y = T_orbit[y]
-
-    # --- 4. Bi-directional Search Loop ---
-    # We continue as long as either search has nodes to expand.
-    while !isempty(queue_x) || !isempty(queue_y)
-
-        # --- 4a. Expand one layer from x ---
-        if !isempty(queue_x)
-            next_queue_x = T_orbit[]
-            for current_x_el in queue_x
-                # g_current is the element that maps x -> current_x_el
-                g_current = from_x[current_x_el]
-
-                for s in S
-                    # new_g = g_current * s
-                    # By the right action property:
-                    # fun(x, new_g) = fun(x, g_current * s) 
-                    #                = fun(fun(x, g_current), s)
-                    #                = fun(current_x_el, s)
-                    new_g = g_current * s
-                    next_x_el = fun(current_x_el, s)
-
-                    # Check for collision: Has the y-search already found this node?
-                    if haskey(from_y, next_x_el)
-                        # COLLISION! We found a path.
-                        g = new_g
-                        h = from_y[next_x_el]
-
-                        # We have:
-                        #   fun(x, g) = next_x_el  (from the x-search)
-                        #   fun(y, h) = next_x_el  (from the y-search)
-                        #
-                        # We want `res` such that fun(x, res) = y.
-                        #
-                        # From fun(y, h) = next_x_el, apply inv(h) to both sides:
-                        #   fun(fun(y, h), inv(h)) = fun(next_x_el, inv(h))
-                        #   fun(y, h * inv(h))     = fun(next_x_el, inv(h))
-                        #   y                      = fun(next_x_el, inv(h))
-                        #
-                        # Now substitute next_x_el with fun(x, g):
-                        #   y = fun(fun(x, g), inv(h))
-                        #   y = fun(x, g * inv(h))
-                        #
-                        # So, our result is g * inv(h)
-                        return g * inv(h)
-                    end
-
-                    # If it's a new element for the x-search, add it
-                    if !haskey(from_x, next_x_el)
-                        from_x[next_x_el] = new_g
-                        push!(next_queue_x, next_x_el)
-                    end
-                end
-            end
-            queue_x = next_queue_x
-        end # end expanding from x
-
-        # --- 4b. Expand one layer from y ---
-        if !isempty(queue_y)
-            next_queue_y = T_orbit[]
-            for current_y_el in queue_y
-                # h_current is the element that maps y -> current_y_el
-                h_current = from_y[current_y_el]
-
-                for s in S
-                    new_h = h_current * s
-                    next_y_el = fun(current_y_el, s)
-
-                    # Check for collision: Has the x-search already found this node?
-                    if haskey(from_x, next_y_el)
-                        # COLLISION! We found a path.
-                        g = from_x[next_y_el]
-                        h = new_h
-
-                        # We have:
-                        #   fun(x, g) = next_y_el
-                        #   fun(y, h) = next_y_el
-                        #
-                        # The logic is identical to the first collision check:
-                        return g * inv(h)
-                    end
-
-                    # If it's a new element for the y-search, add it
-                    if !haskey(from_y, next_y_el)
-                        from_y[next_y_el] = new_h
-                        push!(next_queue_y, next_y_el)
-                    end
-                end
-            end
-            queue_y = next_queue_y
-        end # end expanding from y
-
-    end # end while loop
-
-    # --- 5. No Path Found ---
-    # If we exit the loop, the queues are empty and no collision
-    # was found. x and y are not in the same orbit.
-    return nothing
-end
-
-function quotient_graph(
-    g::AbstractGraph{V}, 
-    G::Group
-) where {V <: Integer}
-    
+function quotient_graph(g::AbstractGraph{V}, G::Group) where {V<:Integer}
     # 1. Compute Vertex Orbits and create the empty quotient graph
     v_set = collect(vertices(g))
-    v_orbits = Oscar.orbits(Oscar.gset(G, v_set))
-    
+    v_gset = Oscar.gset(G, v_set)
+    v_orbits = Oscar.orbits(v_gset)
+
     qg = QuotientGainGraph(G, collect.(v_orbits))
 
     # 2. Compute Edge Orbits
     e_set = collect(edges(g))
-    e_orbits = Oscar.orbits(Oscar.gset(G, on_edges, e_set))
+    e_gset = Oscar.gset(G, on_edges, e_set)
+    e_orbits = Oscar.orbits(e_gset)
 
     # 3. Map representative edges to quotient edges
     for e_orbit in e_orbits
@@ -479,14 +365,13 @@ function quotient_graph(
         # To get the canonical edge form `(i, γ(j))` from the paper,
         # we first find the group element `g` that maps `i_rep` to `u_orig`.
         # Then `g_inv` maps `u_orig` back to its representative `i_rep`.
-        vertex_action = (v, g) -> v^g
-        g = representative_action(G, i_rep, u_orig, vertex_action)
+        g = Oscar.is_conjugate_with_data(v_gset, i_rep, u_orig)[2]
         g_inv = inv(g)
 
         # Apply `g_inv` to the *entire* edge to get its canonical form,
         # which is guaranteed to start at the representative `i_rep`.
         e_canonical = on_edges(e_rep, g_inv)
-        
+
         # We know src(e_canonical) == i_rep. We need the destination.
         v_canonical = dst(e_canonical)
 
@@ -496,54 +381,41 @@ function quotient_graph(
 
         # The "gain" (γ) is the group element that maps the
         # representative `j_rep` to the canonical destination `v_canonical`.
-        gamma = representative_action(G, j_rep, v_canonical, vertex_action)
+        gamma = Oscar.is_conjugate_with_data(v_gset, j_rep, v_canonical)[2]
 
         # Add this directed, gained edge to the quotient graph
         add_gain_edge!(qg, i_idx, j_idx, gamma)
     end
-    
+
     return qg
 end
 
-"""
-    rotation_group_around_origin_2d(θ::Union{Rational, Oscar.QQFieldElem})
-
-Return the 2d rotation group around the origin generated by a rotation of angle `θ`*2π.
-"""
-function rotation_group_around_origin_2d(θ::Union{Rational, Oscar.QQFieldElem})
-    F = Oscar.algebraic_closure(Oscar.QQ)
-    s = sinpi(one(F)*2*θ)
-    c = cospi(one(F)*2*θ)
-    G = Oscar.matrix_group([matrix(F, [c -s; s c])])
-    return G
-end
+#################################################################
+#
+# Orbit Rigidity Matrix
+#
+#################################################################
 
 """
-    compute_orbit_rigidity_matrix(qg, p_reps, phi)
+    orbit_rigidity_matrix(qg::QuotientGainGraph, p_reps::AbstractMatrix{T}, phi::Oscar.GAPGroupHomomorphism{<:Group,<:Oscar.MatrixGroup}) where T
 
 Computes the Orbit Rigidity Matrix (Definition 8) for a
 quotient gain graph `qg` at a specific configuration `p_reps`.
 
 # Arguments
 - `qg::QuotientGainGraph`: The quotient graph.
-- `p_reps::AbstractMatrix{T}`: A `d x nv_0` matrix where `d` is the
-  dimension and `nv_0` is the number of representative vertices.
+- `p_reps::AbstractMatrix{T}`: A `d x nv_0` matrix where `d` is the dimension and `nv_0` is the number of representative vertices.
   `p_reps[:, i]` is the coordinate vector for the i-th representative.
-- `phi::GroupHomomorphism`: An Oscar group homomorphism from `qg.group`
-  to an orthogonal matrix group (e.g., `O(d, R)`).
+- `phi::GroupHomomorphism`: An Oscar group homomorphism from `qg.group` to an orthogonal matrix group (e.g., `O(d, R)`).
 """
-function orbit_rigidity_matrix(
-    qg::QuotientGainGraph,
-    p_reps::AbstractMatrix{T},
-    phi::Oscar.GAPGroupHomomorphism{<:Group, <:Oscar.MatrixGroup}
-) where T<:Real
+function orbit_rigidity_matrix(qg::QuotientGainGraph, p_reps::AbstractMatrix{T}, phi::Oscar.GAPGroupHomomorphism{<:Group,<:Oscar.MatrixGroup}) where T
 
     G = qg.group
     H = Oscar.codomain(phi)
 
     # --- 1. Validate Inputs ---
     d = size(p_reps, 1) # Spatial dimension
-    
+
     # Check p_reps dimensions
     if size(p_reps) != (d, nv(qg))
         error("Position matrix p_reps has wrong size. Expected ($(d), $(nv(qg))), got $(size(p_reps)).")
@@ -555,7 +427,7 @@ function orbit_rigidity_matrix(
     end
 
     # Check homomorphism codomain (matrices) and orthogonality
-    if size(one(H)) != (d,d)
+    if size(one(H)) != (d, d)
         error("Representation codomain has to be a subgroup of O($(d), R), but got matrices of size $(size(one(H))).")
     end
 
@@ -577,32 +449,76 @@ function orbit_rigidity_matrix(
         i = src(e)
         j = dst(e)
         gamma = e.gain
-        
+
         # Call the homomorphism to get the matrix
         phi_g = Matrix(T.(matrix(phi(gamma))))
         # Use M' for inverse of orthogonal matrix
-        phi_g_inv = phi_g' 
+        phi_g_inv = phi_g'
 
         p_i = p_reps[:, i]
         p_j = p_reps[:, j]
 
         # Get column ranges for vertices i and j
-        cols_i = ( (i-1)*d + 1 ) : ( i*d )
-        cols_j = ( (j-1)*d + 1 ) : ( j*d )
+        cols_i = ((i-1)*d+1):(i*d)
+        cols_j = ((j-1)*d+1):(j*d)
 
         if i == j # Loop edge: ((i, i); γ)
-            entry = 2*p_i - phi_g*p_i - phi_g_inv*p_i
+            entry = 2 * p_i - phi_g * p_i - phi_g_inv * p_i
             O[row_idx, cols_i] = entry' # Transpose to get row vector
         else     # Non-loop edge: ((i, j); γ)
-            entry_i = p_i - phi_g*p_j
-            entry_j = p_j - phi_g_inv*p_i
-            
+            entry_i = p_i - phi_g * p_j
+            entry_j = p_j - phi_g_inv * p_i
+
             O[row_idx, cols_i] = entry_i'
             O[row_idx, cols_j] = entry_j'
         end
     end
 
     return O
+end
+
+function orbit_rigidity_matrix(g::SimpleGraph, emb::AbstractMatrix{T}, phi::Oscar.GAPGroupHomomorphism{<:Group,<:Oscar.MatrixGroup}) where T
+    # test that (g, emb) is symmetric for phi
+    if !is_symmetric(g, emb, phi)
+        error("The graph embedding is not symmetric with respect to the given group homomorphism.")
+    end
+
+    # construct the quotient gain graph
+    G = Oscar.domain(phi)
+    qg = quotient_graph(g, G)
+    # get vertex orbits to extract representative positions
+    v_reps = [original_vertex(qg, v) for v in vertices(qg)]
+    # extract representative positions
+    p_reps = hcat([emb[:, v_rep] for v_rep in v_reps]...)
+    # compute and return the orbit rigidity matrix
+    return orbit_rigidity_matrix(qg, p_reps, phi)
+end
+
+"""
+    orbit_rigidity_matrix(f::Framework, phi::Oscar.GAPGroupHomomorphism{<:Group,<:Oscar.MatrixGroup})
+
+Return the orbit rigidity matrix of the framework `f` with respect to the orthogonal representation `phi`.
+"""
+function orbit_rigidity_matrix(f::Framework, phi::Oscar.GAPGroupHomomorphism{<:Group,<:Oscar.MatrixGroup})
+    return orbit_rigidity_matrix(graph(f), coordinate_matrix(f), phi)
+end
+
+##################################################################
+#
+# Auxiliary Functions for Symmetric Frameworks
+#
+##################################################################
+"""
+    rotation_group_around_origin_2d(θ::Union{Rational, Oscar.QQFieldElem})
+
+Return the 2d rotation group around the origin generated by a rotation of angle `θ`*2π.
+"""
+function rotation_group_around_origin_2d(θ::Union{Rational,Oscar.QQFieldElem})
+    F = Oscar.algebraic_closure(Oscar.QQ)
+    s = sinpi(one(F) * 2 * θ)
+    c = cospi(one(F) * 2 * θ)
+    G = Oscar.matrix_group([matrix(F, [c -s; s c])])
+    return G
 end
 
 oscar_graph(g::Graphs.SimpleGraph) = Oscar.graph_from_adjacency_matrix(Undirected, Matrix(Graphs.adjacency_matrix(g)))
@@ -614,27 +530,20 @@ julia_matrix(::Type{T}, g::Oscar.MatrixGroupElem) where T = Matrix(T.(matrix(g))
 
 Return whether the image of the group homomorphism `phi` is a subgroup of an orthogonal matrix group, thus making `phi` an orthogonal representation.
 """
-function is_orthogonal(phi::Oscar.GAPGroupHomomorphism{<:Group, <:Oscar.MatrixGroup})
+function is_orthogonal(phi::Oscar.GAPGroupHomomorphism{<:Group,<:Oscar.MatrixGroup})
     G = Oscar.domain(phi)
     d = size(Oscar.matrix(phi(one(G))))[1]
     for g in gens(G)
         M = julia_matrix(Float64, phi(g))
-        if size(M) != (d,d) || !isapprox(M' * M, I(d); atol=1e-8)
+        if size(M) != (d, d) || !isapprox(M' * M, I(d); atol=1e-8)
             return false
         end
     end
     return true
 end
 
-"""
-    is_symmetric(g::Graph, emb::AbstractMatrix{T}, phi::Oscar.GAPGroupHomomorphism{<:Group, <:Oscar.MatrixGroup}) where T
-
-Return whether the embedding `emb` of the graph `g` is `phi`-symmetric, i.e.
-- the domain of `phi` is a subgroup of the automorphism group of `g`
-- the codomain of `phi` is an orthogonal matrix group
-- for all generators `g` of the codomain of `phi` we have `isapprox(emb[:, collect(1:n)^g], julia_matrix(T, g) * emb; atol=atol)``
-"""
-function is_symmetric(g::SimpleGraph, emb::AbstractMatrix{T}, phi::Oscar.GAPGroupHomomorphism{<:Group, <:Oscar.MatrixGroup}; atol::Real=1e-8) where T
+# check that embedding of a graph is symmetric wrt the representation phi
+function is_symmetric(g::SimpleGraph, emb::AbstractMatrix{T}, phi::Oscar.GAPGroupHomomorphism{<:Group,<:Oscar.MatrixGroup}; atol::Real=1e-8) where T
     G = Oscar.domain(phi)
     n = nv(g)
     embedding_dim = size(emb, 1)
@@ -674,25 +583,63 @@ function is_symmetric(g::SimpleGraph, emb::AbstractMatrix{T}, phi::Oscar.GAPGrou
     return true
 end
 
-is_symmetric(f::Framework{PositionDim, PositionType}, phi::Oscar.GAPGroupHomomorphism{<:Group, <:Oscar.MatrixGroup}) where {PositionDim, PositionType} = is_symmetric(graph(f), coordinate_matrix(f), phi)
+"""
+    is_symmetric(f::Framework{PositionDim,PositionType}, phi::Oscar.GAPGroupHomomorphism{<:Group,<:Oscar.MatrixGroup}) where {PositionDim,PositionType}
 
-function orbit_rigidity_matrix(g::SimpleGraph, emb::AbstractMatrix{T}, phi::Oscar.GAPGroupHomomorphism{<:Group, <:Oscar.MatrixGroup}) where T
-    # test that (g, emb) is symmetric for phi
-    if !is_symmetric(g, emb, phi)
-        error("The graph embedding is not symmetric with respect to the given group homomorphism.")
-    end
+Return whether the framework `f` is `phi`-symmetric, i.e. with `g = graph(f)` and `emb = coordinate_matrix(f)` we have
+- the domain of `phi` is a subgroup of the automorphism group of `g`
+- the codomain of `phi` is an orthogonal matrix group
+- for all generators `g` of the codomain of `phi` we have `isapprox(emb[:, collect(1:n)^g], julia_matrix(T, g) * emb; atol=atol)``
 
-    # construct the quotient gain graph
-    G = Oscar.domain(phi)
-    qg = quotient_graph(g, G)
-    # get vertex orbits to extract representative positions
-    v_reps = [original_vertex(qg, v) for v in vertices(qg)]
-    # extract representative positions
-    p_reps = hcat([emb[:, v_rep] for v_rep in v_reps]...)
-    # compute and return the orbit rigidity matrix
-    return orbit_rigidity_matrix(qg, p_reps, phi)
-end
+```jldoctest
+julia> g = SimpleGraph(6);
 
-function orbit_rigidity_matrix(f::Framework, phi::Oscar.GAPGroupHomomorphism{<:Group, <:Oscar.MatrixGroup})
-    return orbit_rigidity_matrix(graph(f), coordinate_matrix(f), phi)
-end
+julia> add_edge!(g, 1, 2);
+
+julia> add_edge!(g, 2, 3);
+
+julia> add_edge!(g, 1, 3);
+
+julia> add_edge!(g, 1, 4);
+
+julia> add_edge!(g, 2, 5);
+
+julia> add_edge!(g, 3, 6);
+
+julia> add_edge!(g, 4, 5);
+
+julia> add_edge!(g, 5, 6);
+
+julia> add_edge!(g, 4, 6);
+
+julia> G = Oscar.symmetric_group(6);
+
+julia> H, _ = Oscar.sub(G, [Oscar.perm([2,3,1,5,6,4])]);
+
+julia> p = [
+                       cosd(120) sind(120);
+                       cosd(240) sind(240);
+                       cosd(0) sind(0);
+                       1.5*cosd(120) 1.5*sind(120);
+                       1.5*cosd(240) 1.5*sind(240);
+                       1.5*cosd(0) 1.5*sind(0)
+                   ]';
+
+julia> f = Framework(g, p)
+Framework with 6 vertices and 9 edges, vertex labels [1, 2, 3, 4, 5, 6] and 2-realization
+GeometryBasics.Point{2, Float64}[[-0.5, 0.8660254037844386], [-0.5, -0.8660254037844386], [1.0, 0.0], [-0.75, 1.299038105676658], [-0.75, -1.299038105676658], [1.5, 0.0]]
+
+julia> mat_group = RigidityTheoryTools.rotation_group_around_origin_2d(1 // 3) # rotation group around origin generated by rotation of angle 1/3*2π
+Matrix group of degree 2
+  over algebraic closure of rational field
+
+julia> repr = Oscar.hom(H, mat_group, Oscar.gens(H), Oscar.gens(mat_group)) # representation of H as matrix group
+Group homomorphism
+  from permutation group of degree 6
+  to matrix group of degree 2 over QQBar
+
+julia> is_symmetric(f, repr)
+true
+``` 
+"""
+is_symmetric(f::Framework{PositionDim,PositionType}, phi::Oscar.GAPGroupHomomorphism{<:Group,<:Oscar.MatrixGroup}) where {PositionDim,PositionType} = is_symmetric(graph(f), coordinate_matrix(f), phi)
