@@ -506,6 +506,117 @@ end
 
 ########################## symbolic orbit rigidity matrix ##########################
 
+function _symbolic_gain_label(γ)
+    label = filter(ch -> !isspace(ch), string(γ))
+    isempty(label) && return "id"
+    return label
+end
+
+function _representation_symbol(rep_name::String, γ)
+    return Symbolics.variable(Symbol(rep_name * "_" * _symbolic_gain_label(γ)))
+end
+
+function _representative_coordinate_symbol(coord_prefix::String, v_rep::Integer)
+    return Symbolics.variable(Symbol(coord_prefix * "_" * string(v_rep)))
+end
+
+"""
+    symbolic_orbit_rigidity_matrix(qg::QuotientGainGraph; representation_name=:tau, coordinate_prefix=:p)
+
+Construct the orbit rigidity matrix with symbolic entries for the quotient Γ-gain
+graph `qg`. Each column corresponds to a representative vertex and carries one
+symbol `p_i`, where `i` is the original vertex chosen as that representative.
+The image of each gain `γ` under the orthogonal representation is denoted by
+`τ_γ` (or whatever name is given via `representation_name`), so a typical entry
+looks like `p_1 - τ_((1,2)(3,4)) * p_4`.
+"""
+function symbolic_orbit_rigidity_matrix(
+    qg::QuotientGainGraph;
+    representation_name::Union{Symbol,String}=:tau,
+    coordinate_prefix::Union{Symbol,String}=:p,
+)
+    rep_name = string(representation_name)
+    coord_prefix_str = string(coordinate_prefix)
+
+    nv_0 = nv(qg)
+    ne_0 = ne(qg)
+    zero_symbol = Num(0)
+
+    p_symbols = [
+        _representative_coordinate_symbol(coord_prefix_str, original_vertex(qg, i))
+        for i in 1:nv_0
+    ]
+
+    tau_cache = Dict{GroupElem,Num}()
+
+    O = fill(zero_symbol, ne_0, nv_0)
+    for (row_idx, e) in enumerate(edges(qg))
+        i = src(e)
+        j = dst(e)
+        gamma = e.gain
+        gamma_inv = inv(gamma)
+
+        tau_gamma = get!(tau_cache, gamma) do
+            _representation_symbol(rep_name, gamma)
+        end
+        tau_gamma_inv = get!(tau_cache, gamma_inv) do
+            _representation_symbol(rep_name, gamma_inv)
+        end
+
+        if i == j
+            O[row_idx, i] =
+                Num(2) * p_symbols[i] - tau_gamma * p_symbols[i] - tau_gamma_inv * p_symbols[i]
+        else
+            O[row_idx, i] = p_symbols[i] - tau_gamma * p_symbols[j]
+            O[row_idx, j] = p_symbols[j] - tau_gamma_inv * p_symbols[i]
+        end
+    end
+
+    return O
+end
+
+"""
+    symbolic_orbit_rigidity_matrix(g::AbstractGraph, G::Group; representation_name=:tau, coordinate_prefix=:p)
+
+Compute the symbolic orbit rigidity matrix by first forming the quotient gain
+graph of `g` with respect to the group action of `G`.
+"""
+function symbolic_orbit_rigidity_matrix(
+    g::AbstractGraph{V},
+    G::Group;
+    kwargs...,
+) where {V<:Integer}
+    qg = quotient_graph(g, G)
+    return symbolic_orbit_rigidity_matrix(qg; kwargs...)
+end
+
+"""
+    symbolic_orbit_rigidity_matrix(g::SimpleGraph, phi::Oscar.GAPGroupHomomorphism; representation_name=:tau, coordinate_prefix=:p)
+
+Convenience method that uses the domain of `phi` to build the quotient gain graph
+before producing the symbolic orbit rigidity matrix.
+"""
+function symbolic_orbit_rigidity_matrix(
+    g::SimpleGraph,
+    phi::Oscar.GAPGroupHomomorphism{<:Group,<:Oscar.MatrixGroup};
+    kwargs...,
+)
+    return symbolic_orbit_rigidity_matrix(g, Oscar.domain(phi); kwargs...)
+end
+
+"""
+    symbolic_orbit_rigidity_matrix(f::Framework, phi::Oscar.GAPGroupHomomorphism; representation_name=:tau, coordinate_prefix=:p)
+
+Return the symbolic orbit rigidity matrix for the framework `f`.
+"""
+function symbolic_orbit_rigidity_matrix(
+    f::Framework,
+    phi::Oscar.GAPGroupHomomorphism{<:Group,<:Oscar.MatrixGroup};
+    kwargs...,
+)
+    return symbolic_orbit_rigidity_matrix(graph(f), phi; kwargs...)
+end
+
 
 
 ##################################################################
@@ -611,7 +722,7 @@ function rotation_group_around_origin_2d(θ::Union{Rational,Oscar.QQFieldElem})
     return G
 end
 
-oscar_graph(g::Graphs.SimpleGraph) = Oscar.graph_from_adjacency_matrix(Undirected, Matrix(Graphs.adjacency_matrix(g)))
+oscar_graph(g::Graphs.SimpleGraph) = Oscar.graph_from_adjacency_matrix(Oscar.Undirected, Matrix(Graphs.adjacency_matrix(g)))
 
 julia_matrix(::Type{T}, g::Oscar.MatrixGroupElem) where T = Matrix(T.(matrix(g)))
 
