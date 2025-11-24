@@ -504,22 +504,11 @@ function orbit_rigidity_matrix(f::Framework, phi::Oscar.GAPGroupHomomorphism{<:G
     return orbit_rigidity_matrix(graph(f), coordinate_matrix(f), phi)
 end
 
+function basis_sym_inf_motions(f::Framework, phi::Oscar.GAPGroupHomomorphism{<:Group,<:Oscar.MatrixGroup})
+    return nullspace(orbit_rigidity_matrix(f, phi))
+end
+
 ########################## symbolic orbit rigidity matrix ##########################
-
-function _symbolic_gain_label(γ)
-    label = filter(ch -> !isspace(ch), string(γ))
-    isempty(label) && return "id"
-    return label
-end
-
-function _representation_symbol(rep_name::String, γ)
-    return Symbolics.variable(Symbol(rep_name * "_" * _symbolic_gain_label(γ)))
-end
-
-function _representative_coordinate_symbol(coord_prefix::String, v_rep::Integer)
-    return Symbolics.variable(Symbol(coord_prefix * "_" * string(v_rep)))
-end
-
 """
     symbolic_orbit_rigidity_matrix(qg::QuotientGainGraph; representation_name=:tau, coordinate_prefix=:p)
 
@@ -532,20 +521,15 @@ looks like `p_1 - τ_((1,2)(3,4)) * p_4`.
 """
 function symbolic_orbit_rigidity_matrix(
     qg::QuotientGainGraph;
-    representation_name::Union{Symbol,String}=:tau,
+    representation_name::Union{Symbol,String}=:τ,
     coordinate_prefix::Union{Symbol,String}=:p,
 )
-    rep_name = string(representation_name)
-    coord_prefix_str = string(coordinate_prefix)
+    repr = Symbolics.variable(representation_name; T=Symbolics.FnType)
+    points = Symbolics.variables(coordinate_prefix, [original_vertex(qg, v) for v in vertices(qg)])
 
     nv_0 = nv(qg)
     ne_0 = ne(qg)
     zero_symbol = Num(0)
-
-    p_symbols = [
-        _representative_coordinate_symbol(coord_prefix_str, original_vertex(qg, i))
-        for i in 1:nv_0
-    ]
 
     tau_cache = Dict{GroupElem,Num}()
 
@@ -556,19 +540,12 @@ function symbolic_orbit_rigidity_matrix(
         gamma = e.gain
         gamma_inv = inv(gamma)
 
-        tau_gamma = get!(tau_cache, gamma) do
-            _representation_symbol(rep_name, gamma)
-        end
-        tau_gamma_inv = get!(tau_cache, gamma_inv) do
-            _representation_symbol(rep_name, gamma_inv)
-        end
-
         if i == j
             O[row_idx, i] =
-                Num(2) * p_symbols[i] - tau_gamma * p_symbols[i] - tau_gamma_inv * p_symbols[i]
+                Symbolics.value(Num(2) * points[i] - repr(gamma) * points[i] - repr(gamma_inv) * points[i])
         else
-            O[row_idx, i] = p_symbols[i] - tau_gamma * p_symbols[j]
-            O[row_idx, j] = p_symbols[j] - tau_gamma_inv * p_symbols[i]
+            O[row_idx, i] = points[i] - repr(gamma) * points[j]
+            O[row_idx, j] = points[j] - repr(gamma_inv) * points[i]
         end
     end
 
