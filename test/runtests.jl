@@ -1,6 +1,7 @@
 using RigidityTheoryTools
 using Graphs
 using LinearAlgebra
+using GeometryBasics
 import Oscar
 using Test
 
@@ -31,6 +32,39 @@ using Test
 
         @test !is_infrigid(f)
         @test LinearAlgebra.rank(R) == 7
+    end
+    @testset "Utilities" begin
+        G = path_graph(2)
+        f = Framework(G, [0.0 1.0; 0.0 0.0])
+        A = [0.0 -1.0; 1.0 0.0]
+        t = [1.0, 2.0]
+
+        g = transform(f, A, t, check_iso=true)
+        @test coordinate_matrix(f) ≈ [0.0 1.0; 0.0 0.0]
+        @test coordinate_matrix(g) ≈ [1.0 1.0; 2.0 3.0]
+
+        transform!(f, A, t, check_iso=true)
+        @test coordinate_matrix(f) ≈ coordinate_matrix(g)
+        @test_throws ArgumentError transform(f, [2.0 0.0; 0.0 1.0], t, check_iso=true)
+
+        points = [0.0 1.0 0.0; 0.0 0.0 1.0]
+        target = A * points .+ reshape(t, :, 1)
+        A_fit, t_fit, rmsd = kabsch(points, target)
+        @test A_fit ≈ A
+        @test t_fit ≈ t
+        @test isapprox(rmsd, 0.0; atol=1e-12)
+
+        point_cloud = [Point(0.0, 0.0), Point(1.0, 0.0), Point(0.0, 1.0)]
+        target_cloud = [Point(1.0, 2.0), Point(1.0, 3.0), Point(0.0, 2.0)]
+        A_fit, t_fit, rmsd = kabsch(point_cloud, target_cloud)
+        @test A_fit ≈ A
+        @test t_fit ≈ t
+        @test isapprox(rmsd, 0.0; atol=1e-12)
+
+        p = sphere_intersection([Point(0.0, 0.0), Point(1.0, 0.0)], [1.0, 1.0], sign=1)
+        q = sphere_intersection([Point(0.0, 0.0), Point(1.0, 0.0)], [1.0, 1.0], sign=-1)
+        @test collect(p) ≈ [0.5, sqrt(3) / 2]
+        @test collect(q) ≈ [0.5, -sqrt(3) / 2]
     end
     @testset "Symmetric Rigidity" begin
         @testset "Quotient Gain Graph" begin
@@ -91,4 +125,3 @@ using Test
         end
     end
 end
-

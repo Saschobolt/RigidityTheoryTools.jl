@@ -10,6 +10,7 @@ using LinearAlgebra
 
 export Framework, graph, realization, coordinate_matrix, coordinate_matrix!, labels, d
 export rigidity_matrix, basis_inf_motions, is_infrigid, basis_inf_flex, index, is_genrigid, is_isostatic
+export transform!, transform, kabsch, sphere_intersection
 export tiedown, condition, pure_condition
 export plot_framework
 export QuotientGainEdge, QuotientGainGraph, add_gain_edge!, edge_gains, original_vertex, quotient_vertex, out_edges_with_gains, on_edges, representative_action, quotient_graph, orbit_rigidity_matrix, is_symmetric, symmetric_framework
@@ -165,6 +166,7 @@ end
 include("infinitesimal.jl")
 include("henneberg.jl")
 include("pure_condition.jl")
+include("util.jl")
 include("plotting.jl")
 include("symmetric_rigidity.jl")
 
