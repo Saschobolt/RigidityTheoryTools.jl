@@ -43,13 +43,14 @@ function Base.show(io::IO, e::QuotientGainEdge)
 end
 
 """
-A struct representing a Quotient Γ-Gain Graph.
+    QuotientGainGraph{G<:GroupElem, VertexType<:Integer}
 
-This is a directed multigraph where vertices are representative
-vertices from the orbits of a larger graph, and edges
-are representative edges with an associated group "gain".
+A struct representing a quotient gain graph ``G / \\Gamma`` under the action of a symmetry group ``\\Gamma``.
 
-- `G` is the type of the group elements (e.g., `Perm{Int}` from Oscar.jl).
+This is a directed multigraph where vertices correspond to the node orbits ``V / \\Gamma`` of a larger graph ``G = (V, E)`` under the group action.
+Edges ``\\tilde{e} = (u, w; \\gamma)`` correspond to the representative edges from the edge orbits ``E / \\Gamma``, where ``\\gamma \\in \\Gamma`` is the group "gain" associated with traversing from the representative vertex ``u`` to the mapped canonical vertex ``\\gamma \\cdot w``.
+
+- `G` is the type of the group elements (e.g., `Perm{Int}` from `Oscar.jl`).
 - `V_orig` is the integer type of the vertices in the *original* graph.
 """
 mutable struct QuotientGainGraph{G<:GroupElem,VertexType<:Integer} <: AbstractGraph{VertexType}
@@ -400,8 +401,9 @@ end
 """
     orbit_rigidity_matrix(qg::QuotientGainGraph, p_reps::AbstractMatrix{T}, phi::Oscar.GAPGroupHomomorphism{<:Group,<:Oscar.MatrixGroup}) where T
 
-Computes the Orbit Rigidity Matrix (Definition 8) for a
-quotient gain graph `qg` at a specific configuration `p_reps`.
+Computes the Orbit Rigidity Matrix ``O(G/\\Gamma, \\tilde{p})`` for a quotient gain graph `qg` at a specific representative configuration `p_reps` and orthogonal group representation `phi`.
+
+The orbit matrix represents the symmetry-preserving row and column block structure of the full rigidity matrix. For each representative edge ``\\tilde{e} = (u, w; \\gamma)``, the block entries correspond to symmetric derivative conditions involving ``\\phi(\\gamma)``. For a non-loop edge, the entry corresponding to node ``u`` is ``\\tilde{p}_u - \\phi(\\gamma) \\tilde{p}_w`` and for node ``w`` is ``\\tilde{p}_w - \\phi(\\gamma)^{-1} \\tilde{p}_u``.
 
 # Arguments
 - `qg::QuotientGainGraph`: The quotient graph.
@@ -604,9 +606,11 @@ end
 """
     symmetric_framework(g::Graphs.AbstractSimpleGraph, p_reps::Dict{<:Integer,Point{EmbeddingDim,EmbeddingType}}, phi::Oscar.GAPGroupHomomorphism{<:Group,<:Oscar.MatrixGroup}) where {EmbeddingDim,EmbeddingType}
 
-Compute a symmetric embedding of the graph `g` with respect to the orthogonal representation `phi` of a permutation group acting on the vertices of `g`, given the positions of representative vertices `p_reps`.`
+Compute a ``\\Gamma``-symmetric realization of the graph `g` with respect to the orthogonal representation `phi`: ``\\phi: \\Gamma \\to O(d)``, where ``\\Gamma`` is a permutation group acting on the vertices of `g`.
 
-```
+A framework is ``\\Gamma``-symmetric if for all vertices ``v \\in V`` and group elements ``\\gamma \\in \\Gamma``, the position satisfies ``p_{\\gamma \\cdot v} = \\phi(\\gamma) p_v``. This function reconstructs the full framework given the positions `p_reps` of exactly one representative vertex from each node orbit.
+
+```jldoctest
 julia> g = SimpleGraph(6);
 
 julia> add_edge!(g, 1, 2);

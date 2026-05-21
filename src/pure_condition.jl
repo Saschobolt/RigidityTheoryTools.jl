@@ -5,11 +5,12 @@ end
 """
     tiedown(g::Graphs.AbstractSimpleGraph, d::Integer; tiedown_verts::Union{Nothing,AbstractVector{<:Integer}})
 
-Preprocessing step to calculate pure condition of `g`. Transform `g` into a directed graph and add standard tiedown bars directed from vertices of the graph
-to tiedown verts. If `tiedown_verts` are given, 1 bar is added to the `d`-th vertex, 2 to the `(d-1)`-st, ... `d` to the 1st. If `tiedown_verts` is `nothing`, the first `d` vertices are chosen.
+Preprocessing step to calculate the pure condition of `g`. Transform ``G`` into a directed graph and add standard tiedown bars directed from vertices of the graph to tiedown vertices, effectively removing the ``\\binom{d+1}{2}`` trivial rigid body continuous motions (translations and rotations).
 
-A directed graph is returned. This is because every edge from a vertex `v` to a vertex `w` corresponds to a non zero `1 × d` submatrix of the rigidity matrix (exactly the submatrix indexed by the edge `{v,w}` and the vertex `v`).
-This is, why we only add an edge  from a vertex v ̲~towards~ a tiedown vertex w as they add a 1 × d submatrix indexed with the edge {v,w} and the vertex v."""
+If `tiedown_verts` are given, 1 artificial edge is added to the ``d``-th vertex, 2 to the ``(d-1)``-st, ..., ``d`` to the 1st. If `tiedown_verts` is `nothing`, the first ``d`` vertices are chosen.
+
+A directed graph is returned. Every directed edge from a vertex ``v`` to a vertex ``w`` corresponds to a non-zero ``1 \\times d`` submatrix of the rigidity matrix (specifically, the submatrix indexed by the edge ``\\{v, w\\}`` and the vertex ``v``).
+"""
 function tiedown(g::Graphs.AbstractSimpleGraph, d::Integer=2; tiedown_verts::Union{Nothing,AbstractVector{<:Integer}}=nothing)
     @assert Graphs.nv(g) >= d "Number of vertices needs to be larger than dimension, but got $(Graphs.nv(g)) vertices and dimension $d."
     if isnothing(tiedown_verts)
@@ -142,10 +143,13 @@ end
 """
     condition(g::Graphs.AbstractSimpleGraph, d::Integer=2; tiedown_verts::Union{Nothing,AbstractVector{<:Integer}}=nothing, vertex_labels::Vector=collect(1:nv(g)), tiedown_label_prefix::String="tiedown")
 
-Calculate the condition for the graph `g` to be infinitesimally flexible in P^`d` as an element of its bracket algebra with tiedown.
+Calculate the condition for the graph `g` to be infinitesimally flexible in ``\\mathbb{P}^d`` (or equivalently generic ``\\mathbb{R}^d``) as an element of its bracket algebra ``\\mathcal{B}`` with tiedown.
+
+The condition is constructed by evaluating the structural determinants of the rigidity matrix ``R(G, p)`` via iterated Laplace expansion. It expresses the theoretical flexibility of generic frameworks of ``G`` as a polynomial in the coordinates of the vertices.
+
 # Arguments:
-- g::Graphs.AbstractSimpleGraph                                     Graph of which condition is computed
-- d::Integer=2                                                      Dimension of underlying projective space
+- `g::Graphs.AbstractSimpleGraph`: Graph for which the condition is computed.
+- `d::Integer=2`: Dimension of the underlying projective space.
 - tiedown_verts::Union{Nothing,AbstractVector{<:Integer}}=nothing   Vertex indices of vertices to tie down.
 - vertex_labels::Vector=collect(1:nv(g))                            Labels for vertices in bracket algebra expression.
 - tiedown_label_prefix::String="tiedown"                            Prefix for tiedown vertex label in bracket algebra expression.
@@ -189,10 +193,13 @@ end
 """
     pure_condition(g::Graphs.AbstractSimpleGraph, d::Integer=2; tiedown_verts::Union{Nothing,AbstractVector{<:Integer}}=nothing, vertex_labels::Vector=collect(1:nv(g)))
 
-Calculate the pure condition for the graph `g` to be infinitesimally flexible in P^`d` as an element of its bracket algebra with tiedown.
+Calculate the pure condition for the graph `g` to be infinitesimally flexible in generic ``\\mathbb{R}^d`` as an element of its bracket algebra ``\\mathcal{B}`` with tiedown.
+
+For an isostatic graph, its condition factors into irreducible components. The pure condition is obtained by strategically removing the tiedown dependencies to obtain the intrinsic rigid condition. 
+
 # Arguments:
-- g::Graphs.AbstractSimpleGraph                                     Graph of which condition is computed
-- d::Integer=2                                                      Dimension of underlying projective space
+- `g::Graphs.AbstractSimpleGraph`: Graph for which the condition is computed.
+- `d::Integer=2`: Dimension of the underlying space.
 - tiedown_verts::Union{Nothing,AbstractVector{<:Integer}}=nothing   Vertex indices of vertices to tie down. Has to form an isostatic subgraph
 - vertex_labels::Vector=collect(1:nv(g))                            Labels for vertices in bracket algebra expression.
 - tiedown_label_prefix::String="tiedown"                            Prefix for tiedown vertex label in bracket algebra expression.

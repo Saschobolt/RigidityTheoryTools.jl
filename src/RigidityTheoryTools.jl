@@ -22,11 +22,13 @@ abstract type AbstractEmbeddedGraph end
 
 mutable struct Framework{PositionDim,PositionType} <: AbstractEmbeddedGraph
     """
-    A framework is the realization of a graph in a `PositionDim`-dimensional space. It is represented by a graph `G`, a realization `realization` and a vector of vertex labels `labels`.
+    A framework is the realization of a graph in a `PositionDim`-dimensional space. Mathematically, a framework in ``\\mathbb{R}^d`` is a pair ``(G, p)`` where ``G = (V, E)`` is a finite graph and ``p: V \\to \\mathbb{R}^d`` maps each vertex to a point in ``d``-dimensional space.
+
+    It is represented by a graph `G`, a realization vector `realization` and an optional vector of vertex labels `labels`.
 
     # Fields
-    - `G::SimpleGraph`: graph with `n` vertices and `m` edges
-    - `realization::Vector{Point{PositionDim,PositionType}}`: `n`-element vector of points describing the vertex positions
+    - `G::SimpleGraph`: graph with ``n`` vertices and ``m`` edges
+    - `realization::Vector{Point{PositionDim,PositionType}}`: ``n``-element vector of points describing the vertex positions
     - `labels::Vector`: vector of vertex labels
     """
     G::SimpleGraph # graph with n vertices and m edges
@@ -102,6 +104,11 @@ Return the realization of the framework `f`.
 """
 realization(f::AbstractEmbeddedGraph) = deepcopy(f.realization)
 
+"""
+    coordinate_matrix(f::AbstractEmbeddedGraph)
+
+Return the realization of the framework `f` as a matrix, where the ``i``-th column corresponds to the coordinates of the ``i``-th vertex.
+"""
 coordinate_matrix(f::AbstractEmbeddedGraph) = Matrix(hcat([p for p in f.realization]...))
 
 """
